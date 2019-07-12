@@ -47,6 +47,9 @@ class DataFrameLabeler():
         """
         self.data = data
 
+        if plotter is None:
+            raise ValueError('plotter argument must be set')
+
         # either use label_col or labels
         self.label_col = label_col
         if label_col is not None:
@@ -124,9 +127,9 @@ class DataFrameLabeler():
             display(self.plotter(rowiter[0], rowiter[1]))
         return widgets.VBox([self.make_selection(rowiter), out])
 
-    def make_row(self, outs, rowiters) -> widgets.HBox:
+    def make_row(self, outs, rowtuple) -> widgets.HBox:
         """Combines several boxes into a row."""
-        widgetrow = [self.make_box(out, row) for out, row in zip(outs, rowiters)]
+        widgetrow = [self.make_box(out, row) for out, row in zip(outs, rowtuple)]
         return widgets.HBox(widgetrow)
 
     def make_next_button(self, handler=None) -> widgets.Button:
@@ -153,6 +156,30 @@ class DataFrameLabeler():
         self.active_selections = []
         self.render()
 
+    def next_batch(self):
+        """Constructing the next batch by consuming self.it"""
+        if self.finished:
+            return
+
+        self.batch = []
+        try:
+            # use all rows if we ignore target column
+            if self.overwrite:
+                for i in range(self.batch_size):
+                    self.batch.append(next(self.it))
+            # use the rows where the label in the target column is not one of the label
+            else:
+                count = 0
+                while count < self.batch_size:
+                    it = next(self.it)
+                    idx, row = it
+                    if(row[self.target_col] not in self.options):
+                        self.batch.append(it)
+                        count += 1
+        except StopIteration:
+            self.finished = True
+
+
     def render(self) -> None:
         """Render output"""
         clear_output()
@@ -161,32 +188,17 @@ class DataFrameLabeler():
             display(self.make_label_finished())
             return
 
-        rowiters = []
-        try:
-            # use all rows if we ignore target column
-            if self.overwrite:
-                for i in range(self.batch_size):
-                    rowiters.append(next(self.it))
-            # use the rows where the label in the target column is not one of the label
-            else:
-                count = 0
-                while count < self.batch_size:
-                    it = next(self.it)
-                    idx, row = it
-                    if(row[self.target_col] not in self.options):
-                        rowiters.append(it)
-                        count += 1
-        except StopIteration:
-            self.finished = True
-            if len(rowiters) != 0:
-                widgetlist = [self.make_row(self.outs[i*self.columns:(i+1)*self.columns], rowiters[i*self.columns:(i+1)*self.columns])
-                              for i in range(self.rows)]
-                widgetlist.append(self.make_next_button(handler=self.next))
-                display(widgets.VBox(widgetlist))
-            else:
-                display(self.make_label_finished())
-        else:
-            widgetlist = [self.make_row(self.outs[i*self.columns:(i+1)*self.columns], rowiters[i*self.columns:(i+1)*self.columns])
+        self.next_batch()
+
+        if len(self.batch) != 0:
+            widgetlist = [self.make_row(self.outs[i*self.columns:(i+1)*self.columns],
+                                        self.batch[i*self.columns:(i+1)*self.columns])
                           for i in range(self.rows)]
-            widgetlist.append(self.make_next_button(handler=self.next))
+            if self.finished:
+                widgetlist.append(self.make_label_finished())
+            else:
+                widgetlist.append(self.make_next_button(handler=self.next))
+
             display(widgets.VBox(widgetlist))
+        else:
+            display(widgets.VBox([self.make_label_finished()]))
