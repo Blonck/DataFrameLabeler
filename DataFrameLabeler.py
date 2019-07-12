@@ -32,21 +32,37 @@ class rowiter():
             self.cur += 1
             return (ret, self.df.loc[ret])
 
-    def forward(self) -> None:
-        if self.cur < self.length:
-            self.cur += 1
+    def forward(self, steps:int=1) -> None:
+        self.cur += steps
+        self.cur = min(self.length, self.cur)
 
-    def backward(self) -> None:
-        if self.cur != 0:
-            self.cur -= 1
+    def forward_until_last(self, steps:int=1) -> None:
+        self.cur += steps
+        self.cur = min(self.length-1, self.cur)
+
+    def backward(self, steps:int=1) -> None:
+        self.cur -= steps
+        self.cur = max(-1, self.cur)
+
+    def backward_until_first(self, steps:int=1) -> None:
+        self.cur -= steps
+        self.cur = max(0, self.cur)
 
     def end(self) -> bool:
-        if self.cur < 0 or self.cur == self.length:
+        if self.cur < 0 or self.cur >= self.length:
             return True
         else:
             return False
 
+    def is_first(self) -> bool:
+        return self.cur == 0
+
+    def is_last(self) -> bool:
+        return self.cur == (self.length - 1)
+
     def get(self):
+        if self.end:
+            raise StopIteration
         return (self.index[self.cur], self.df.loc[self.index[self.cur]])
 
     def get_state(self) -> int:
@@ -98,7 +114,7 @@ class DataFrameLabeler():
         self.data = data
 
         if plotter is None:
-            raise ValueError('plotter argument must be set')
+            raise ValueError('`plotter` argument must be set')
 
         # either use label_col or labels
         self.label_col = label_col
@@ -107,20 +123,25 @@ class DataFrameLabeler():
         elif labels is not None:
             self.options = labels
         else:
-            raise ValueError('Either label_col or labels must be set.')
+            raise ValueError('Either `label_col` or `labels` must be set.')
 
         if target_col is None:
-            raise ValueError('target_col is necessary to save labels')
+            raise ValueError('`target_col` is necessary to save labels')
         else:
             self.target_col = target_col
             if not target_col in self.data.columns:
                 self.data[target_col] = np.nan
 
-        self.overwrite = overwrite_existing_targets
-
         if additional_labels is not None:
             # throw out duplicated options
             self.options = list(set(self.options) + set(addiotional_labels))
+
+        self.overwrite = overwrite_existing_targets
+
+        # the index which rows should not be touched
+        if not self.overwrite:
+            self.ignore_row = self.data[target_col].isin(self.options)
+
 
         self.rows = height
         self.columns = width
@@ -132,7 +153,8 @@ class DataFrameLabeler():
 
         self.plotter = plotter
         self.it = self.data.iterrows()
-        self.on_end = False
+        self.last_frame = False
+        self.first_frame = True
 
         self.rowiter = rowiter(self.data)
 
@@ -188,10 +210,26 @@ class DataFrameLabeler():
     def make_next_button(self, handler=None) -> widgets.Button:
         """Constructs the button to save the data and show the next batch."""
         btn = widgets.Button(description='Save & Next',
-                             layout=Layout(width='100%', height='40px'))
+                             layout=Layout(width='70%', height='40px'))
         if handler is not None:
             btn.on_click(handler)
         return btn
+
+    def make_prev_button(self, handler=None) -> widgets.Button:
+        btn = widgets.Button(description='Save & Back',
+                             layout=Layout(width='30%', height='40px'))
+        if handler is not None:
+            btn.on_click(handler)
+        return btn
+
+    def make_nav_bar(self) -> widgets.HBox:
+        widgetlist = []
+
+        widgetlist.append(self.make_prev_button())
+        widgetlist.append(self.make_next_button(handler=self.next))
+
+        return widgets.HBox(widgetlist)
+
 
     @classmethod
     def make_label_finished(cls) -> widgets.Label:
@@ -210,9 +248,12 @@ class DataFrameLabeler():
         self.render()
 
 
+    def back(self, _) -> None:
+        pass
+
     def next_batch(self):
-        """Constructing the next batch by consuming self.it"""
-        if self.on_end:
+        """Constructing the next batch by consuming self.rowiter"""
+        if self.last_frame:
             return
 
         self.batch = []
@@ -220,26 +261,26 @@ class DataFrameLabeler():
             # use all rows if we ignore target column
             if self.overwrite:
                 for i in range(self.batch_size):
-                    self.batch.append(next(self.rowiter.get()))
+                    self.batch.append(next(self.rowiter))
             # use the rows where the label in the target column is not one of the label
             else:
                 count = 0
                 while count < self.batch_size:
                     it = next(self.rowiter)
                     idx, row = it
-                    if(row[self.target_col] not in self.options):
+                    if(not self.ignore_row.loc[idx]):
                         self.batch.append(it)
                         count += 1
         except StopIteration:
-            self.on_end = True
-
+            self.last_frame = True
 
     def render(self) -> None:
         """Render output"""
         clear_output()
 
-        if self.on_end:
-            display(self.make_label_finished())
+        if self.last_frame:
+            display(widgets.VBox([self.make_label_finished(),
+                                  self.make_nav_bar()]))
             return
 
         self.next_batch()
@@ -248,11 +289,7 @@ class DataFrameLabeler():
             widgetlist = [self.make_row(self.outs[i*self.columns:(i+1)*self.columns],
                                         self.batch[i*self.columns:(i+1)*self.columns])
                           for i in range(self.rows)]
-            if self.on_end:
-                widgetlist.append(self.make_label_finished())
-            else:
-                widgetlist.append(self.make_next_button(handler=self.next))
-
+            widgetlist.append(self.make_nav_bar())
             display(widgets.VBox(widgetlist))
         else:
-            display(widgets.VBox([self.make_label_finished()]))
+            display(widgets.VBox([self.make_nav_bar()]))

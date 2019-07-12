@@ -1,2 +1,4 @@
 # DataFrameLabeler
-Using ipywidgests to label a pandas data frame
+Using ipywidgets to label data inside jupyter
+
+TODO:
