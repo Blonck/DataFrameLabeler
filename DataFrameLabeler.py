@@ -7,6 +7,55 @@ from ipywidgets import widgets, Layout
 from IPython.display import clear_output, display
 
 
+class rowiter():
+    """Class allowing bidirectional iterating a pandas Frame.
+
+    When the calling next/previous on end, this iterator raise StopIteration,
+    but stays at its current position.
+
+    Note: This concept makes no sense in the context of python iterators.
+          Nevertheless, just do it here and see what happens.
+    """
+    def __init__(self, df: pd.DataFrame):
+        self.index = df.index
+        self.df = df
+        self.cur = 0
+        self.length = len(self.index)
+        if self.length == 0:
+            raise StopIteration
+
+    def __next__(self):
+        if self.cur >= self.length:
+            raise StopIteration
+        else:
+            ret = self.index[self.cur]
+            self.cur += 1
+            return (ret, self.df.loc[ret])
+
+    def forward(self) -> None:
+        if self.cur < self.length:
+            self.cur += 1
+
+    def backward(self) -> None:
+        if self.cur != 0:
+            self.cur -= 1
+
+    def end(self) -> bool:
+        if self.cur < 0 or self.cur == self.length:
+            return True
+        else:
+            return False
+
+    def get(self):
+        return (self.index[self.cur], self.df.loc[self.index[self.cur]])
+
+    def get_state(self) -> int:
+        return self.cur
+
+    def set_state(self, state: int) -> None:
+        self.cur = state
+
+
 class DataFrameLabeler():
     """Displays rows of Pandas data frame for labeling/relabeling.
 
@@ -18,6 +67,7 @@ class DataFrameLabeler():
     * currently the plotter function return value is put directly into an widgets.Output,
       it should also allow to return a widget
     * rethink interface
+    * allow going back
     """
     def __init__(self, data: pd.DataFrame, *,
                  label_col=None,
@@ -82,9 +132,12 @@ class DataFrameLabeler():
 
         self.plotter = plotter
         self.it = self.data.iterrows()
-        self.finished = False
+        self.on_end = False
+
+        self.rowiter = rowiter(self.data)
 
         self.render()
+
 
     def get_labeled_data(self) -> pd.DataFrame:
         """ Return the labeled data frame."""
@@ -156,9 +209,10 @@ class DataFrameLabeler():
         self.active_selections = []
         self.render()
 
+
     def next_batch(self):
         """Constructing the next batch by consuming self.it"""
-        if self.finished:
+        if self.on_end:
             return
 
         self.batch = []
@@ -166,25 +220,25 @@ class DataFrameLabeler():
             # use all rows if we ignore target column
             if self.overwrite:
                 for i in range(self.batch_size):
-                    self.batch.append(next(self.it))
+                    self.batch.append(next(self.rowiter.get()))
             # use the rows where the label in the target column is not one of the label
             else:
                 count = 0
                 while count < self.batch_size:
-                    it = next(self.it)
+                    it = next(self.rowiter)
                     idx, row = it
                     if(row[self.target_col] not in self.options):
                         self.batch.append(it)
                         count += 1
         except StopIteration:
-            self.finished = True
+            self.on_end = True
 
 
     def render(self) -> None:
         """Render output"""
         clear_output()
 
-        if self.finished:
+        if self.on_end:
             display(self.make_label_finished())
             return
 
@@ -194,7 +248,7 @@ class DataFrameLabeler():
             widgetlist = [self.make_row(self.outs[i*self.columns:(i+1)*self.columns],
                                         self.batch[i*self.columns:(i+1)*self.columns])
                           for i in range(self.rows)]
-            if self.finished:
+            if self.on_end:
                 widgetlist.append(self.make_label_finished())
             else:
                 widgetlist.append(self.make_next_button(handler=self.next))
