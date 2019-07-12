@@ -1,17 +1,14 @@
 import pandas as pd
 import numpy as np
+
 from collections.abc import Iterable
 from typing import List, Callable, Union
-
 from ipywidgets import widgets, Layout
 from IPython.display import clear_output, display
 
 
 class rowiter():
     """Class allowing bidirectional iterating a pandas Frame.
-
-    When the calling next/previous on end, this iterator raise StopIteration,
-    but stays at its current position.
 
     Note: This concept makes no sense in the context of python iterators.
           Nevertheless, just do it here and see what happens.
@@ -54,14 +51,14 @@ class rowiter():
         else:
             return False
 
-    def is_first(self) -> bool:
-        return self.cur == 0
+    def distance_to_end(self) -> int:
+        return self.length - self.cur
 
-    def is_last(self) -> bool:
-        return self.cur == (self.length - 1)
+    def distance_to_begin(self) -> int:
+        return self.cur
 
     def get(self):
-        if self.end:
+        if self.end():
             raise StopIteration
         return (self.index[self.cur], self.df.loc[self.index[self.cur]])
 
@@ -76,14 +73,14 @@ class DataFrameLabeler():
     """Displays rows of Pandas data frame for labeling/relabeling.
 
     TODO: 
-    * allow multi selection
+    * incorporate ignoring rows into rowiter -> remove hack + correct buttons
+    * rework how user defined plotter works, atm its horrifying, especially when
+      using matplotlib
     * proper styling of buttons
     * allow groupby argument
-    * add automatic saving of intermediate result to csv or pickle
-    * currently the plotter function return value is put directly into an widgets.Output,
-      it should also allow to return a widget
+    * allow multi selection
+    * add automatic saving of intermediate result to csv or pickle file
     * rethink interface
-    * allow going back
     """
     def __init__(self, data: pd.DataFrame, *,
                  label_col=None,
@@ -142,6 +139,16 @@ class DataFrameLabeler():
         if not self.overwrite:
             self.ignore_row = self.data[target_col].isin(self.options)
 
+        # use simple row plotter if user does not provide plot function
+        if plotter is not None:
+            self.plotter = plotter
+        else:
+            def row_plotter(idx, row):
+                print(idx)
+                print(row)
+
+            self.plotter = row_plotter
+
 
         self.rows = height
         self.columns = width
@@ -151,13 +158,9 @@ class DataFrameLabeler():
         # stores the active selection shown to the user
         self.active_selections = []
 
-        self.plotter = plotter
-        self.it = self.data.iterrows()
-        self.last_frame = False
-        self.first_frame = True
-
         self.rowiter = rowiter(self.data)
 
+        self.next_batch()
         self.render()
 
 
@@ -207,29 +210,58 @@ class DataFrameLabeler():
         widgetrow = [self.make_box(out, row) for out, row in zip(outs, rowtuple)]
         return widgets.HBox(widgetrow)
 
-    def make_next_button(self, handler=None) -> widgets.Button:
+    def make_next_button(self) -> widgets.Button:
         """Constructs the button to save the data and show the next batch."""
-        btn = widgets.Button(description='Save & Next',
+        # TODO this check ignores that some rows are ignored
+        # which may lead to a StopIteration exception
+        if self.rowiter.distance_to_end() == 0:
+            desc='Save'
+            handler=self.handle_save
+        else:
+            desc='Save & Next'
+            handler=self.next
+
+        btn = widgets.Button(description=desc,
                              layout=Layout(width='70%', height='40px'))
-        if handler is not None:
-            btn.on_click(handler)
+        btn.on_click(handler)
+
         return btn
 
-    def make_prev_button(self, handler=None) -> widgets.Button:
-        btn = widgets.Button(description='Save & Back',
+    def make_prev_button(self) -> widgets.Button:
+        # TODO this check ignores that some rows are ignored
+        # which may lead to a StopIteration exception
+        if self.rowiter.distance_to_begin() <= self.batch_size:
+            desc='Save'
+            handler=self.handle_save
+        else:
+            desc='Save & Back'
+            handler=self.back
+
+        btn = widgets.Button(description=desc,
                              layout=Layout(width='30%', height='40px'))
-        if handler is not None:
-            btn.on_click(handler)
+        btn.on_click(handler)
+
         return btn
 
     def make_nav_bar(self) -> widgets.HBox:
         widgetlist = []
 
         widgetlist.append(self.make_prev_button())
-        widgetlist.append(self.make_next_button(handler=self.next))
+        widgetlist.append(self.make_next_button())
 
         return widgets.HBox(widgetlist)
 
+    def save_selection(self):
+        # go over current selection and save its state
+        for rowiter, btn in self.active_selections:
+            idx, _ = rowiter
+            self.data.loc[idx, self.target_col] = btn.value if btn.value is not None else np.nan
+
+    def handle_save(self, _):
+        self.save_selection()
+
+    def clear_selection(self):
+        self.active_selections = []
 
     @classmethod
     def make_label_finished(cls) -> widgets.Label:
@@ -239,51 +271,61 @@ class DataFrameLabeler():
     def next(self, _) -> None:
         """Prepares the next batch and render it"""
 
-        # go over current selection and save its state
-        for rowiter, btn in self.active_selections:
-            idx, row = rowiter
-            self.data.loc[idx, self.target_col] = btn.value if btn.value is not None else np.nan
+        self.save_selection()
+        self.clear_selection()
 
-        self.active_selections = []
+        self.next_batch()
         self.render()
 
-
     def back(self, _) -> None:
-        pass
+        self.save_selection()
+        self.clear_selection()
+
+        self.prev_batch()
+        self.render()
+
+    def prev_batch(self):
+        if self.overwrite:
+            steps = self.batch_size + len(self.batch)
+            self.rowiter.backward_until_first(steps=steps)
+        #TODO going backward and then forward is not optimal
+        else:
+            try:
+                count = 0
+                while count < (self.batch_size+len(self.batch)):
+                    self.rowiter.backward()
+                    idx, _ = self.rowiter.get()
+                    if(not self.ignore_row.loc[idx]):
+                        count += 1
+            except StopIteration:
+                next(self.rowiter)
+                pass
+
+        self.next_batch()
 
     def next_batch(self):
         """Constructing the next batch by consuming self.rowiter"""
-        if self.last_frame:
-            return
-
         self.batch = []
         try:
             # use all rows if we ignore target column
             if self.overwrite:
-                for i in range(self.batch_size):
+                for _ in range(self.batch_size):
                     self.batch.append(next(self.rowiter))
             # use the rows where the label in the target column is not one of the label
             else:
                 count = 0
                 while count < self.batch_size:
                     it = next(self.rowiter)
-                    idx, row = it
+                    idx, _ = it
                     if(not self.ignore_row.loc[idx]):
                         self.batch.append(it)
                         count += 1
         except StopIteration:
-            self.last_frame = True
+            pass
 
     def render(self) -> None:
         """Render output"""
         clear_output()
-
-        if self.last_frame:
-            display(widgets.VBox([self.make_label_finished(),
-                                  self.make_nav_bar()]))
-            return
-
-        self.next_batch()
 
         if len(self.batch) != 0:
             widgetlist = [self.make_row(self.outs[i*self.columns:(i+1)*self.columns],
