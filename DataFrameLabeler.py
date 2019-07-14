@@ -1,3 +1,5 @@
+"""
+"""
 import pandas as pd
 import numpy as np
 
@@ -6,87 +8,15 @@ from typing import List, Callable, Union
 from ipywidgets import widgets, Layout
 from IPython.display import clear_output, display
 
-
-class rowiter():
-    """Class allowing bidirectional iterating a pandas Frame.
-
-    Note: This concept makes no sense in the context of python iterators.
-          Nevertheless, just do it here and see what happens.
-    """
-    def __init__(self, df: pd.DataFrame):
-        self.index = df.index
-        self.df = df
-        self.cur = 0
-        self.length = len(self.index)
-        if self.length == 0:
-            raise StopIteration
-
-    def __next__(self):
-        if self.cur >= self.length:
-            raise StopIteration
-        else:
-            ret = self.index[self.cur]
-            self.cur += 1
-            return (ret, self.df.loc[ret])
-
-    def forward(self, steps:int=1) -> None:
-        self.cur += steps
-        self.cur = min(self.length, self.cur)
-
-    def forward_until_last(self, steps:int=1) -> None:
-        self.cur += steps
-        self.cur = min(self.length-1, self.cur)
-
-    def backward(self, steps:int=1) -> None:
-        self.cur -= steps
-        self.cur = max(-1, self.cur)
-
-    def backward_until_first(self, steps:int=1) -> None:
-        self.cur -= steps
-        self.cur = max(0, self.cur)
-
-    def end(self) -> bool:
-        if self.cur < 0 or self.cur >= self.length:
-            return True
-        else:
-            return False
-
-    def distance_to_end(self) -> int:
-        return self.length - self.cur
-
-    def distance_to_begin(self) -> int:
-        return self.cur
-
-    def get(self):
-        if self.end():
-            raise StopIteration
-        return (self.index[self.cur], self.df.loc[self.index[self.cur]])
-
-    def get_state(self) -> int:
-        return self.cur
-
-    def set_state(self, state: int) -> None:
-        self.cur = state
-
+from rowiter import rowiter
 
 class DataFrameLabeler():
     """Displays rows of Pandas data frame for labeling/relabeling.
-
-    TODO: 
-    * incorporate ignoring rows into rowiter -> remove hack + correct buttons
-    * rework how user defined plotter works, atm its horrifying, especially when
-      using matplotlib
-    * proper styling of buttons
-    * allow groupby argument
-    * allow multi selection
-    * add automatic saving of intermediate result to csv or pickle file
-    * rethink interface
     """
     def __init__(self, data: pd.DataFrame, *,
                  label_col=None,
                  additional_labels: Iterable=None,
                  target_col=None,
-                 overwrite_existing_targets=True,
                  labels: List=None,
                  plotter: Callable=None,
                  width=2,
@@ -99,8 +29,6 @@ class DataFrameLabeler():
                           Should not be set if `labels` parameter is set.
         :param: additional_labels Labels which should be used next to the ones in `label_col'
                                   Only valid if `label_col` is set.
-        :param: overwrite_existing_targets If 'False' all rows which have a valid label in `target_col` will
-                                           not be shown, and thus, not be relabeled.
         :param: labels List of possible labels.
                        Should not be set if `label_col` parameter is set.
         :param: plotter Callable which plots a row of the data frame.
@@ -132,12 +60,6 @@ class DataFrameLabeler():
         if additional_labels is not None:
             # throw out duplicated options
             self.options = list(set(self.options) + set(addiotional_labels))
-
-        self.overwrite = overwrite_existing_targets
-
-        # the index which rows should not be touched
-        if not self.overwrite:
-            self.ignore_row = self.data[target_col].isin(self.options)
 
         # use simple row plotter if user does not provide plot function
         if plotter is not None:
@@ -285,21 +207,8 @@ class DataFrameLabeler():
         self.render()
 
     def prev_batch(self):
-        if self.overwrite:
-            steps = self.batch_size + len(self.batch)
-            self.rowiter.backward_until_first(steps=steps)
-        #TODO going backward and then forward is not optimal
-        else:
-            try:
-                count = 0
-                while count < (self.batch_size+len(self.batch)):
-                    self.rowiter.backward()
-                    idx, _ = self.rowiter.get()
-                    if(not self.ignore_row.loc[idx]):
-                        count += 1
-            except StopIteration:
-                next(self.rowiter)
-                pass
+        steps = self.batch_size + len(self.batch)
+        self.rowiter.backward_until_first(steps=steps)
 
         self.next_batch()
 
@@ -308,18 +217,9 @@ class DataFrameLabeler():
         self.batch = []
         try:
             # use all rows if we ignore target column
-            if self.overwrite:
-                for _ in range(self.batch_size):
-                    self.batch.append(next(self.rowiter))
-            # use the rows where the label in the target column is not one of the label
-            else:
-                count = 0
-                while count < self.batch_size:
-                    it = next(self.rowiter)
-                    idx, _ = it
-                    if(not self.ignore_row.loc[idx]):
-                        self.batch.append(it)
-                        count += 1
+            for _ in range(self.batch_size):
+                self.batch.append(next(self.rowiter))
+
         except StopIteration:
             pass
 
