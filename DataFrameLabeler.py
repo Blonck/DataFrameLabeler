@@ -1,10 +1,10 @@
 """
 """
-import pandas as pd
-import numpy as np
-
 from collections.abc import Iterable
 from typing import List, Callable, Union
+
+from pandas import DataFrame
+from numpy import nan
 from ipywidgets import widgets, Layout
 from IPython.display import clear_output, display
 
@@ -13,9 +13,8 @@ from rowiter import rowiter
 class DataFrameLabeler():
     """Displays rows of Pandas data frame for labeling/relabeling.
     """
-    def __init__(self, data: pd.DataFrame, *,
+    def __init__(self, data: DataFrame, *,
                  label_col=None,
-                 additional_labels: Iterable=None,
                  target_col=None,
                  labels: List=None,
                  plotter: Callable=None,
@@ -24,13 +23,14 @@ class DataFrameLabeler():
                  ):
         """
         :param: data Pandas data frame where each row should be labeled.
+        :param: target_col Selected labels will be written to this column.
+                           Will be created if not existent in `data`.
+                           Values in `target_col` will be used as preselection if parameter `label_col` is not set.
+        :param: labels List of possible labels. If set additionally to `label_col` parameter, only labels in `labels`
+                       will be used.
         :param: label_col Column name in `data` where existing labels are stored which will
-                          be used as preselection when labeling the data.
-                          Should not be set if `labels` parameter is set.
-        :param: additional_labels Labels which should be used next to the ones in `label_col'
-                                  Only valid if `label_col` is set.
-        :param: labels List of possible labels.
-                       Should not be set if `label_col` parameter is set.
+                          be used as preselection when labeling the data. If `labels` is not set, all values
+                          in `label_col` will be used as labels.
         :param: plotter Callable which plots a row of the data frame.
                         This function will be called with the index and the row of data which should be labeled.
         :param: width Number of samples shown in one row.
@@ -41,25 +41,18 @@ class DataFrameLabeler():
         if plotter is None:
             raise ValueError('`plotter` argument must be set')
 
-        # either use label_col or labels
         self.label_col = label_col
-        if label_col is not None:
-            self.options = self.data[label_col].unique().tolist()
-        elif labels is not None:
+        if labels is not None:
             self.options = labels
-        else:
-            raise ValueError('Either `label_col` or `labels` must be set.')
+        elif label_col is not None:
+            self.options = self.data[label_col].unique().tolist()
 
         if target_col is None:
             raise ValueError('`target_col` is necessary to save labels')
         else:
             self.target_col = target_col
             if not target_col in self.data.columns:
-                self.data[target_col] = np.nan
-
-        if additional_labels is not None:
-            # throw out duplicated options
-            self.options = list(set(self.options).union(set(additional_labels)))
+                self.data[target_col] = nan
 
         # use simple row plotter if user does not provide plot function
         if plotter is not None:
@@ -69,7 +62,7 @@ class DataFrameLabeler():
                 print(idx)
                 print(row)
 
-            self.plotter = row_plotteraddiotional_labels
+            self.plotter = row_plotter
 
 
         self.rows = height
@@ -86,7 +79,7 @@ class DataFrameLabeler():
         self.render()
 
 
-    def get_labeled_data(self) -> pd.DataFrame:
+    def get_labeled_data(self) -> DataFrame:
         """ Return the labeled data frame."""
         return self.data
 
@@ -95,7 +88,7 @@ class DataFrameLabeler():
         row = rowiter[1]
 
         # set value of selector from label column if label column was set
-        if self.label_col is not None:
+        if self.label_col is not None and row[self.label_col] in self.options:
             value = row[self.label_col]
         else:
             # set value of selector from target column if the value
@@ -177,7 +170,7 @@ class DataFrameLabeler():
         # go over current selection and save its state
         for rowiter, btn in self.active_selections:
             idx, _ = rowiter
-            self.data.loc[idx, self.target_col] = btn.value if btn.value is not None else np.nan
+            self.data.loc[idx, self.target_col] = btn.value if btn.value is not None else nan
 
     def handle_save(self, _):
         self.save_selection()
