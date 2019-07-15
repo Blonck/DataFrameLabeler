@@ -8,7 +8,7 @@ from numpy import nan
 from ipywidgets import widgets, Layout
 from IPython.display import clear_output, display
 
-from rowiter import rowiter
+from Rowiter import Rowiter
 
 class DataFrameLabeler():
     """Displays rows of Pandas data frame for labeling/relabeling.
@@ -19,20 +19,20 @@ class DataFrameLabeler():
                  labels: List=None,
                  plotter: Callable=None,
                  width=2,
-                 height=2,
-                 ):
+                 height=2):
         """
         :param: data Pandas data frame where each row should be labeled.
         :param: target_col Selected labels will be written to this column.
-                           Will be created if not existent in `data`.
-                           Values in `target_col` will be used as preselection if parameter `label_col` is not set.
-        :param: labels List of possible labels. If set additionally to `label_col` parameter, only labels in `labels`
-                       will be used.
+                Will be created if not existent in `data`.
+                Values in `target_col` will be used as preselection if parameter `label_col`
+                is not set.
+        :param: labels List of possible labels. If set additionally to `label_col` parameter,
+                only labels in `labels` will be used.
         :param: label_col Column name in `data` where existing labels are stored which will
-                          be used as preselection when labeling the data. If `labels` is not set, all values
-                          in `label_col` will be used as labels.
+                be used as preselection when labeling the data. If `labels` is not set, all values
+                in `label_col` will be used as labels.
         :param: plotter Callable which plots a row of the data frame.
-                        This function will be called with the index and the row of data which should be labeled.
+                This function will be called with the index and the row of data which should be labeled.
         :param: width Number of samples shown in one row.
         :param: height Number of rows shown in one batch.
         """
@@ -73,7 +73,7 @@ class DataFrameLabeler():
         # stores the active selection shown to the user
         self.active_selections = []
 
-        self.rowiter = rowiter(self.data)
+        self.rowiter = Rowiter(self.data)
 
         self.next_batch()
         self.render()
