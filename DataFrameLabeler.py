@@ -59,7 +59,7 @@ class DataFrameLabeler():
 
         if additional_labels is not None:
             # throw out duplicated options
-            self.options = list(set(self.options) + set(addiotional_labels))
+            self.options = list(set(self.options).union(set(additional_labels)))
 
         # use simple row plotter if user does not provide plot function
         if plotter is not None:
@@ -69,7 +69,7 @@ class DataFrameLabeler():
                 print(idx)
                 print(row)
 
-            self.plotter = row_plotter
+            self.plotter = row_plotteraddiotional_labels
 
 
         self.rows = height
