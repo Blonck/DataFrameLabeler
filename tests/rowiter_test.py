@@ -70,6 +70,36 @@ class RowiterTestSuite(unittest.TestCase):
                 self.assertTrue((row == trow).all())
 
 
+    def test_backward(self):
+        df = pd.DataFrame(np.arange(0, 10))
+        self.assertEqual(df.shape, (10, 1))
+        rowiter = Rowiter.Rowiter(df)
+
+        # go to end of data frame
+        for i in rowiter:
+            pass
+
+        # ensure that iterator is at end
+        self.assertRaises(StopIteration, rowiter.get)
+
+        # go backwards
+        for i in range(9, -1, -1):
+           rowiter.backward()
+
+           tidx, trow = rowiter.get()
+           idx = df.index[i]
+           row = df.iloc[i, :]
+
+           self.assertEqual(idx, tidx)
+           self.assertTrue((row == trow).all())
+
+        # should be no rows left
+        rowiter.backward()
+        self.assertRaises(StopIteration, rowiter.get)
+
+
+
+
 
 
 

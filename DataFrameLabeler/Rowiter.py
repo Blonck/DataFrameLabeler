@@ -15,6 +15,9 @@ class Rowiter():
         self.cur = 0
         self.length = len(self.index)
 
+    def __iter__(self):
+        return self
+
     def __next__(self):
         """Return the current element and iterate to the next row."""
         if self.cur >= self.length:
@@ -64,8 +67,18 @@ class Rowiter():
         """Return the number of steps needed until the beginning of the data frame."""
         return self.cur
 
+    def exceeded(self) -> bool:
+        """Return 'True' if the iterator is over the bound in either of the two directions."""
+        if self.cur < 0 or self.cur >= self.length:
+            return True
+        else:
+            return False
+
     def get(self):
-        """Return index and pd.Series of the current row."""
-        if self.end():
+        """Return index and pd.Series of the current row.
+
+        :raises: StopIteration if iterator is over the bound in either of the two directions.
+        """
+        if self.exceeded():
             raise StopIteration
         return (self.index[self.cur], self.df.loc[self.index[self.cur]])
