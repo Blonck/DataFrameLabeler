@@ -2,7 +2,6 @@
 Using ipywidgests to label a pandas data frame
 
 ## TODO:
-* incorporate ignoring rows into rowiter -> remove hack + correct buttons
 * rework how user defined plotter works, atm its horrifying, especially when
   using matplotlib
 * proper styling of buttons
