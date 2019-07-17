@@ -50,7 +50,7 @@ lbl = DataFrameLabeler(df,
 # To obtain the newly labeled data frame call
 lbl.get_labeled_data()
 ```
-![Result](images/screenshot_lbl.png)
+![Result](images/screenshot_res.png)
 
 ## TODO:
 * rework how user defined plotter works, atm its horrifying, especially when
