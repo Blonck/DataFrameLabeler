@@ -38,14 +38,15 @@ class DataFrameLabeler():
         """
         self.data = data
 
-        if plotter is None:
-            raise ValueError('`plotter` argument must be set')
-
         self.label_col = label_col
         if labels is not None:
             self.options = labels
         elif label_col is not None:
+            if label_col not in self.data.columns:
+                raise ValueError('`label_col` does not exists in `df`')
             self.options = self.data[label_col].unique().tolist()
+        else:
+            raise ValueError('either `labels` or `label_col` parameter must be set')
 
         if target_col is None:
             raise ValueError('`target_col` is necessary to save labels')
@@ -127,8 +128,6 @@ class DataFrameLabeler():
 
     def make_next_button(self) -> widgets.Button:
         """Constructs the button to save the data and show the next batch."""
-        # TODO this check ignores that some rows are ignored
-        # which may lead to a StopIteration exception
         if self.rowiter.distance_to_end() == 0:
             desc='Save'
             handler=self.handle_save
@@ -143,8 +142,6 @@ class DataFrameLabeler():
         return btn
 
     def make_prev_button(self) -> widgets.Button:
-        # TODO this check ignores that some rows are ignored
-        # which may lead to a StopIteration exception
         if self.rowiter.distance_to_begin() <= self.batch_size:
             desc='Save'
             handler=self.handle_save
