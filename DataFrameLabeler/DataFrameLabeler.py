@@ -18,6 +18,7 @@ class DataFrameLabeler():
                  target_col=None,
                  labels: List=None,
                  plotter: Callable=None,
+                 button_type: str='auto',
                  width=2,
                  height=2):
         """
@@ -33,6 +34,9 @@ class DataFrameLabeler():
                in `label_col` will be used as labels.
         :param plotter: Callable which plots a row of the data frame.
                This function will be called with the index and the row of data which should be labeled.
+        :param button_type: 'auto' - automatically select button type
+                            'button' - use toggle buttons to select label
+                            'list' - use selection list to select label
         :param width: Number of samples shown in one row.
         :param height: Number of rows shown in one batch.
         """
@@ -54,6 +58,18 @@ class DataFrameLabeler():
             self.target_col = target_col
             if not target_col in self.data.columns:
                 self.data[target_col] = nan
+
+        btypes = ['auto', 'button', 'list']
+        if button_type not in btypes:
+            raise ValueError('`button_type` must be one out of `' + '`, `'.join(btypes) + '`')
+
+        if button_type == 'auto':
+            if len(self.options) > 3:
+                self.button_type = 'list'
+            else:
+                self.button_type = 'button'
+        else:
+            self.button_type = button_type
 
         # use simple row plotter if user does not provide plot function
         if plotter is not None:
@@ -99,9 +115,7 @@ class DataFrameLabeler():
             else:
                 value = None
 
-        # use ToggleButton widget only the number of labels is small
-        # TODO refactor: either make configurable or don't use magic number
-        if len(self.options) <= 3:
+        if self.button_type == 'button':
             sel = widgets.ToggleButtons(
                     options=self.options,
                     orientation='horizontal',
