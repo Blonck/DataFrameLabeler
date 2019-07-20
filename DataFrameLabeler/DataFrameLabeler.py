@@ -118,7 +118,6 @@ class DataFrameLabeler():
         if self.button_type == 'button':
             sel = widgets.ToggleButtons(
                     options=self.options,
-                    orientation='horizontal',
                     value=value,
                     layout=Layout(width='100%'))
         else:
