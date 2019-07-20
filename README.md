@@ -7,11 +7,10 @@ Currently, the only way to use the DataFrameLabeler is to clone this repositroy.
 
 # Why?
 
-I searched for a tool to manually label data for machine-learning applications. Beside tools for computer vision
-or NLP I've found none, so I wrote this little helper class.
+This small tool was inspired by the fast.ai image cleaner widget https://docs.fast.ai/widgets.image_cleaner.html .
+However, I needed a tool for tabular data.
 
 # How to use?
-
 
 ```
 # imports
@@ -47,8 +46,7 @@ lbl = DataFrameLabeler(df,
 ```
 ![DataFrameLabeler](images/screenshot_lbl.png)
 ```
-# To obtain the newly labeled data frame call
-lbl.get_labeled_data()
+# To obtain the newly labeled data frame call lbl.get_labeled_data()
 ```
 ![Result](images/screenshot_res.png)
 
