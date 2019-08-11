@@ -60,4 +60,3 @@ lbl = DataFrameLabeler(df,
 * rethink interface
 * add more unit tests
 * Documentation
-* Packaging

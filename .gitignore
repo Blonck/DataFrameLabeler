@@ -1,0 +1,5 @@
+dist
+build
+**/__pycache__/
+.ipynb_checkpoints/
+DataFrameLabeler.egg-info/
