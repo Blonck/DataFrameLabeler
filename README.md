@@ -7,7 +7,7 @@ Currently, the only way to use the DataFrameLabeler is to clone this repositroy.
 
 # Why?
 
-This small tool was inspired by the fast.ai image cleaner widget https://docs.fast.ai/widgets.image_cleaner.html .
+This small tool was inspired by the fast.ai image cleaner widget https://fastai1.fast.ai/widgets.image_cleaner.html.
 However, I needed a tool for tabular data.
 
 # How to use?
