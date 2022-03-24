@@ -36,13 +36,14 @@ def plotter(idx, row):
     
 # Afterwards, just construct a DataFrameLabeler object.
 # If `target_col` exists in the data frame, its content will be used as preselection.
-lbl = DataFrameLabeler(df,
-                       labels=['FAILURE', 'SUCCESS'], # choices for the labels
-                       plotter=plotter,               # function which plots each row
-                       target_col='class_name',       # column name where the labels will be stored
-                       width=3,                       # number of figures in each row
-                       height=2                       # number of rows shown at once
-                       )
+lbl = DataFrameLabeler(
+    df,
+    labels=['FAILURE', 'SUCCESS'], # choices for the labels
+    plotter=plotter,               # function which plots each row
+    target_col='class_name',       # column name where the labels will be stored
+    width=3,                       # number of figures in each row
+    height=2                       # number of rows shown at once
+)
 ```
 ![DataFrameLabeler](images/screenshot_lbl.png)
 ```
